@@ -128,7 +128,14 @@
     <Compile Include="Bookmarks\Data.cs" />
     <Compile Include="Bookmarks\OauthConfig.cs" />
     <Compile Include="Bookmarks\TokenApi.cs" />
-    <Compile Include="Bookmarks\BookmarksFilter.cs" />
+    <!-- Excluded as of the 1.45.1 port: BookmarksFilter is an optional integration with
+         BetterSongList (only used if that mod is installed), and BetterSongList in turn needs
+         BeatSaberPlaylistsLib. Porting that whole chain would mean adapting to a separate,
+         unrelated refactor of Beat Saber's own IPreviewBeatmapLevel/IBeatmapLevelCollection/
+         IAnnotatedBeatmapLevelCollection interfaces, which is out of scope for getting core
+         search/download/browse working. Re-add once BetterSongList + BeatSaberPlaylistsLib
+         are ported. -->
+    <!-- <Compile Include="Bookmarks\BookmarksFilter.cs" /> -->
     <Compile Include="Misc\Filters.cs" />
     <Compile Include="Misc\SongDownloader.cs" />
     <Compile Include="Misc\Sprites.cs" />

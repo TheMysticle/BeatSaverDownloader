@@ -65,15 +65,10 @@ namespace BeatSaverDownloader
 
             PluginUI.instance.Setup(_bookmarksApi, _queueManager);
 
-            if (PluginManager.GetPlugin("BetterSongList") != null)
-                RegisterBookmarksFilter();
+            // BookmarksFilter (BetterSongList integration) is excluded from this build as of
+            // the 1.45.1 port -- see the comment on its Compile item in the csproj.
 
             BSEvents.earlyMenuSceneLoadedFresh += OnMenuSceneLoadedFresh;
-        }
-
-        private void RegisterBookmarksFilter()
-        {
-            var _ = new BookmarksFilter(_bookmarksApi);
         }
 
         [OnEnable]
@@ -94,7 +89,7 @@ namespace BeatSaverDownloader
             _bookmarksApi.Store();
         }
 
-        private void OnMenuSceneLoadedFresh(ScenesTransitionSetupDataSO data)
+        private void OnMenuSceneLoadedFresh(ScenesTransitionSetupData data)
         {
             try
             {
