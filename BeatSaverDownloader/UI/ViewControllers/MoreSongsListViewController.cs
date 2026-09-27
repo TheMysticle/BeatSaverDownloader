@@ -535,6 +535,43 @@ namespace BeatSaverDownloader.UI.ViewControllers
             return options;
         }
 
+        /// <summary>
+        /// Retries a page-fetch delegate a few times with a short backoff before giving up.
+        /// Logs every failed attempt (and the final one, before rethrowing) so a transient
+        /// network hiccup shows up in the log instead of just silently leaving the list empty --
+        /// see the caller's catch block for why this matters.
+        /// </summary>
+        private static async Task<T> FetchPageWithRetry<T>(Func<Task<T>> fetch, string context, int maxAttempts = 3)
+        {
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    return await fetch();
+                }
+                catch (TaskCanceledException)
+                {
+                    // The menu was closed or a new search/filter started -- not a failure, don't retry.
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    if (attempt < maxAttempts)
+                    {
+                        Plugin.LOG.Warn($"{context} failed (attempt {attempt}/{maxAttempts}), retrying: {e.Message}");
+                        await Task.Delay(500 * attempt);
+                        continue;
+                    }
+
+                    Plugin.LOG.Critical($"{context} failed after {maxAttempts} attempts, giving up.");
+                    Plugin.LOG.Critical(e);
+                    throw;
+                }
+            }
+
+            throw new InvalidOperationException("unreachable");
+        }
+
         private async Task GetPagesBeatSaver(uint count)
         {
             var newMaps = new List<Beatmap>();
@@ -545,8 +582,8 @@ namespace BeatSaverDownloader.UI.ViewControllers
                     _fetchingDetails = $"({i + 1}/{count})";
 
                     var page = CurrentBeatSaverFilter != Filters.BeatSaverFilterOptions.Uploader
-                        ? await Plugin.BeatSaver.SearchBeatmaps(GenerateOptions(CurrentBeatSaverFilter, AllowAIGeneratedMaps), (int)_lastPage, _cancellationTokenSource.Token)
-                        : await _currentUploader.Beatmaps((int)_lastPage, _cancellationTokenSource.Token);
+                        ? await FetchPageWithRetry(() => Plugin.BeatSaver.SearchBeatmaps(GenerateOptions(CurrentBeatSaverFilter, AllowAIGeneratedMaps), (int)_lastPage, _cancellationTokenSource.Token), "Fetching BeatSaver page")
+                        : await FetchPageWithRetry(() => _currentUploader.Beatmaps((int)_lastPage, _cancellationTokenSource.Token), "Fetching uploader page");
 
                     _lastPage++;
 
@@ -555,9 +592,14 @@ namespace BeatSaverDownloader.UI.ViewControllers
 
                     if (page?.Empty != false) break;
                 }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
                 catch (Exception)
                 {
-                    // pages didn't load properly
+                    // FetchPageWithRetry already logged the failure details; just stop paging.
+                    break;
                 }
             }
 
@@ -595,7 +637,7 @@ namespace BeatSaverDownloader.UI.ViewControllers
                 try
                 {
                     _fetchingDetails = $"({i + 1}/{count})";
-                    var page = await Plugin.BeatSaver.SearchBeatmaps(new SearchTextFilterOption(_currentSearch), (int) _lastPage, _cancellationTokenSource.Token);
+                    var page = await FetchPageWithRetry(() => Plugin.BeatSaver.SearchBeatmaps(new SearchTextFilterOption(_currentSearch), (int)_lastPage, _cancellationTokenSource.Token), "Fetching BeatSaver search page");
 
                     _lastPage++;
 
@@ -604,9 +646,14 @@ namespace BeatSaverDownloader.UI.ViewControllers
 
                     if (page?.Empty != false) break;
                 }
-                catch
+                catch (TaskCanceledException)
                 {
-                    // really should add proper error handling to this
+                    break;
+                }
+                catch (Exception)
+                {
+                    // FetchPageWithRetry already logged the failure details; just stop paging.
+                    break;
                 }
             }
 
